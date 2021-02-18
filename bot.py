@@ -238,6 +238,9 @@ class MealPlanner:
         meal_plans_list = requests.get(f"{self.meal_planner_url}users/{user['mp_user_id']}/mealPlans").json()
         return meal_plans_list
 
+    def add_meal_plan_to_shopping_list(self, user, meal_plan_id):
+        pass
+
     def is_error(self, obj):
         return "error" in obj
 
@@ -249,6 +252,7 @@ class Bot:
         self.logger = logging.getLogger(__name__)
         self.profile_manager = profile.ProfileManager(self.meal_planner, self.logger)
         self.meal_plan_manager = meal_plan.MealPlanManager(self.meal_planner, self.logger)
+        self.shopping_list_manager = meal_plan.ShoppingListManager(self.meal_planner, self. logger)
 
 
     def start(self) -> None:
