@@ -197,8 +197,8 @@ class MealPlanner:
 
     # Function to retrieve user by id from db
     def get_user(self, username):
-        r = requests.get(f"{self.meal_planner_url}users/giovannasdasdi")
-        print(r.json())
+        r = requests.get(f"{self.meal_planner_url}users/{username}")
+        return r.json()
 
     # Function to insert and update user in db
     def update_user(self, user):
@@ -223,7 +223,6 @@ class MealPlanner:
         return r['neededCalories']
 
     def create_meal_plan(self, user, days, meals_per_day):
-        print("##################", user)
         payload = {
             'calories' : self.get_needed_calories(user),
             'n' : days,
@@ -234,6 +233,10 @@ class MealPlanner:
         saved_meal_plan = requests.post(f"{self.meal_planner_url}mealPlans/{user['mp_user_id']}", json=new_meal_plan).json()
        
         return saved_meal_plan
+
+    def get_meal_plans(self, user):
+        meal_plans_list = requests.get(f"{self.meal_planner_url}users/{user['mp_user_id']}/mealPlans").json()
+        return meal_plans_list
 
     def is_error(self, obj):
         return "error" in obj
@@ -258,9 +261,11 @@ class Bot:
         # Add conversation handler with the states CHOOSING, TYPING_CHOICE and TYPING_REPLY
         profile_handler = self.profile_manager.conv_handler
         create_meal_plan_handler = self.meal_plan_manager.conv_handler_create
-        
+        view_meal_plans_handler = self.meal_plan_manager.conv_handler_view
         dispatcher.add_handler(profile_handler)
         dispatcher.add_handler(create_meal_plan_handler)
+        dispatcher.add_handler(view_meal_plans_handler)
+        
         # Start the Bot
         updater.start_polling()
 
