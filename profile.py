@@ -7,6 +7,8 @@ from telegram.ext import (
     ConversationHandler,
     CallbackContext,
 )
+from datetime import date
+
 class ProfileManager:
     def __init__(self, db, logger):
         self.BIRTH, self.WEIGHT, self.HEIGHT, self.SEX, self.DIET, self.ACTIVITY_FACTOR, \
@@ -27,7 +29,7 @@ class ProfileManager:
 
         self.activity_keyboard = [
             ['Next?','A bit','Average'],
-            ['Quite a lot', 'Athlete']
+            ['Quite a lot', 'I\'m an athlete']
         ]
         self.activity_markup = ReplyKeyboardMarkup(self.activity_keyboard, one_time_keyboard=True)
 
@@ -38,36 +40,60 @@ class ProfileManager:
                     MessageHandler(
                         Filters.regex('^\d{4}$') & ~(Filters.command | Filters.regex('^Done$')),
                         self.birth_year,
+                    ),
+                    MessageHandler(
+                        Filters.text & ~(Filters.command | Filters.regex('^Done$')),
+                        self.error_invalid_birthyear,
                     )
                 ],
                 self.WEIGHT: [
                     MessageHandler(
                         Filters.regex('^\d+$') & ~(Filters.command | Filters.regex('^Done$')),
                         self.weight,
+                    ),
+                    MessageHandler(
+                        Filters.text & ~(Filters.command | Filters.regex('^Done$')),
+                        self.error_number_required,
                     )
                 ],
                 self.HEIGHT: [
                     MessageHandler(
                         Filters.regex('^\d+$') & ~(Filters.command | Filters.regex('^Done$')),
                         self.height,
+                    ),
+                    MessageHandler(
+                        Filters.text & ~(Filters.command | Filters.regex('^Done$')),
+                        self.error_number_required,
                     )
                 ],
                 self.SEX: [
                     MessageHandler(
                         Filters.regex('^(M|F|Other)$') & ~(Filters.command | Filters.regex('^Done$')),
                         self.sex,
+                    ),
+                    MessageHandler(
+                        Filters.text & ~(Filters.command | Filters.regex('^Done$')),
+                        self.error_invalid_sex,
                     )
                 ],
                 self.DIET: [
                     MessageHandler(
                         Filters.regex('^(Omnivorous|Vegan|Vegetarian|Gluten free)$') & ~(Filters.command | Filters.regex('^Done$')),
                         self.diet,
+                    ),
+                    MessageHandler(
+                        Filters.text & ~(Filters.command | Filters.regex('^Done$')),
+                        self.error_invalid_diet,
                     )
                 ],
                 self.ACTIVITY_FACTOR: [
                     MessageHandler(
                         Filters.regex('^(Next\?|A bit|Average|Quite a lot|Athlete)$') & ~(Filters.command | Filters.regex('^Done$')),
                         self.activity_factor,
+                    ),
+                    MessageHandler(
+                        Filters.text & ~(Filters.command | Filters.regex('^Done$')),
+                        self.error_invalid_activity_factor,
                     )
                 ],
                 # self.CHOOSING: [
@@ -96,12 +122,48 @@ class ProfileManager:
         user["id"] = chat.id
         user["username"] = chat.username
         user["name"] = chat.first_name
-        return user  
+        return user 
+
+    def error_number_required(self, update, context):
+        update.message.reply_text(
+            """Hey, apparently that's not a valid answer. You should answer with a number."""
+        )
+
+    def error_invalid_birthyear(self, update, context):
+        update.message.reply_text(
+            """Huh, that doesn't seem like the year you were born in. Tell me the truth."""
+        )
+
+    def error_invalid_sex(self, update, context):
+        update.message.reply_text(
+            """Uh-oh. I'm sorry, it seems I can't help you. You should choose a sex \
+among 'M' (male), 'F' (female) or 'Other'.
+            """
+        )
+
+
+    def error_invalid_diet(self, update, context):
+        update.message.reply_text(
+            """Yow, that's got to be a new diet type! 
+Unfortunately I only know \
+'Omnivorous', 'Vegetarian', 'Vegan' and  'Gluten free'. Please choose \
+among these types, I'll make sure to lean more about that.
+            """
+        )
+
+    def error_invalid_activity_factor(self, update, context):
+        update.message.reply_text(
+            """Ouch, I don't think understand what you mean. Could you be more precise? \
+I only know how to behave to the following answers:
+'Next?', 'A bit', 'Average', 'Quite a lot', 'I\'m an athlete'
+            """
+        )
+
 
     def start(self, update: Update, context: CallbackContext) -> int:
         update.message.reply_text(
-            "Welcome to meal planner bot."
-            """Why don't you tell me something about yourself?
+            """Welcome to meal planner bot.
+To help you to manage your meal plans, I need to know more about you.
 What is your birth year?
             """,
             # reply_markup=markup,
@@ -113,10 +175,16 @@ What is your birth year?
     def birth_year(self, update: Update, context: CallbackContext) -> int:
         text = update.message.text
         birth_year = int(text)
-        context.user_data['birth_year'] = birth_year
-        update.message.reply_text(f'Wonderful! Tell me your weight (in kilos), please.')
-        return self.WEIGHT
+        
+        current_year = date.today().year
+        if birth_year > current_year:
+            error_str = "I am not able to serve visitors from the future, I'm sorry."
+            update.message.reply_text(error_str)
+            return self.BIRTH
 
+        context.user_data['birth_year'] = birth_year
+        update.message.reply_text(f'Wonderful! Tell me your weight (in kg), please.')
+        return self.WEIGHT
 
     def weight(self, update: Update, context: CallbackContext) -> int:
         text = update.message.text
@@ -137,7 +205,7 @@ What is your birth year?
         text = update.message.text
         sex = text.lower() if text in ['M', 'F'] else 'm'
         context.user_data['sex'] = sex
-        update.message.reply_text(f'Brillant! Tell me your diet, please.',
+        update.message.reply_text(f'Brillant! What is your diet type?',
             reply_markup=self.diet_markup)
         return self.DIET
         
@@ -153,7 +221,7 @@ What is your birth year?
         text = update.message.text
         diet = diet_map[text]
         context.user_data['diet_type'] = diet
-        update.message.reply_text(f'Stunning! How active are you?',
+        update.message.reply_text(f'Stunning! How active would you define yourself?',
             reply_markup=self.activity_markup)
         return self.ACTIVITY_FACTOR
         
@@ -163,18 +231,18 @@ What is your birth year?
                 'A bit': 'light',
                 'Average': 'moderate',
                 'Quite a lot': 'very',
-                'Athlete': 'extra'
+                'I\'m an athlete': 'extra'
                 }
 
         text = update.message.text
         activity = activity_map[text]
         context.user_data['activity_factor'] = activity
         
-        update.message.reply_text(f'We are updating your profile...')
+        update.message.reply_text(f'I\'m updating your profile...')
         
         user = self.save_user(context.user_data, update)
         
-        update.message.reply_text(f'Magnificent! We saved your information correctly\n{user}')
+        update.message.reply_text(f'Magnificent! Your information have been saved correctly\n{user}')
         context.user_data.clear()
         return ConversationHandler.END
 
