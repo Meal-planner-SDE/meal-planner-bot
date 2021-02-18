@@ -88,7 +88,7 @@ class ProfileManager:
                 ],
                 self.ACTIVITY_FACTOR: [
                     MessageHandler(
-                        Filters.regex('^(Next\?|A bit|Average|Quite a lot|Athlete)$') & ~(Filters.command | Filters.regex('^Done$')),
+                        Filters.regex('^(Next\?|A bit|Average|Quite a lot|I\'m an athlete)$') & ~(Filters.command | Filters.regex('^Done$')),
                         self.activity_factor,
                     ),
                     MessageHandler(
