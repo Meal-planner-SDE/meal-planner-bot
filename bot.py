@@ -169,9 +169,10 @@
 # if __name__ == '__main__':
 #     bot = Bot()
 import logging
-import profile
+import profile, meal_plan
 import requests
 from typing import Dict
+from datetime import date
 
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (
@@ -190,26 +191,49 @@ logging.basicConfig(
 TOKEN = "1585535684:AAFj6jKfe6Nud4unaRZwS5HXi5VrzbHFSrs"
 
 # Class that handle all the database functions
-class Database:
+class MealPlanner:
     def __init__(self):
-        self.database_url = "https://meal-plan-sde-db-adapter.herokuapp.com/"
+        self.meal_planner_url = "https://meal-plan-sde-meal-plan.herokuapp.com/"
 
     # Function to retrieve user by id from db
     def get_user(self, username):
-        r = requests.get(f"{self.database_url}users/giovannasdasdi")
+        r = requests.get(f"{self.meal_planner_url}users/giovannasdasdi")
         print(r.json())
 
     # Function to insert and update user in db
     def update_user(self, user):
-        r = requests.get(f"{self.database_url}users/{user['username']}")
+        r = requests.get(f"{self.meal_planner_url}users/{user['username']}")
         if (self.is_error(r.json())):
             #post
-            r = requests.post(f"{self.database_url}users/", data=user)
+            r = requests.post(f"{self.meal_planner_url}users/", data=user)
         else:
             #patch
-            r = requests.patch(f"{self.database_url}users/{r.json()['mp_user_id']}", data=user)
+            r = requests.patch(f"{self.meal_planner_url}users/{r.json()['mp_user_id']}", data=user)
         return r.json()
-            
+
+    def get_needed_calories(self, user):
+        payload = {
+            'height' : user['height'],
+            'weight' : user['weight'],
+            'age' : date.today().year - user['birth_year'],
+            'sex' : user['sex'],
+            'activityFactor' : user['activity_factor']
+        }
+        r = requests.get(f"{self.meal_planner_url}calories", params=payload).json()
+        return r['neededCalories']
+
+    def create_meal_plan(self, user, days, meals_per_day):
+        print("##################", user)
+        payload = {
+            'calories' : self.get_needed_calories(user),
+            'n' : days,
+            'm' : meals_per_day,
+            'diet' : user['diet_type']
+        }
+        new_meal_plan = dict(requests.get(f"{self.meal_planner_url}mealPlans", params=payload).json())
+        saved_meal_plan = requests.post(f"{self.meal_planner_url}mealPlans/{user['mp_user_id']}", json=new_meal_plan).json()
+       
+        return saved_meal_plan
 
     def is_error(self, obj):
         return "error" in obj
@@ -218,23 +242,25 @@ class Database:
 
 class Bot:
     def __init__(self):
-        self.db = Database()
+        self.meal_planner = MealPlanner()
         self.logger = logging.getLogger(__name__)
-        self.profile_manager = profile.ProfileManager(self.db, self.logger)
+        self.profile_manager = profile.ProfileManager(self.meal_planner, self.logger)
+        self.meal_plan_manager = meal_plan.MealPlanManager(self.meal_planner, self.logger)
 
 
     def start(self) -> None:
         # Create the Updater and pass it your bot's token.
         updater = Updater(TOKEN)
-
+        
         # Get the dispatcher to register handlers
         dispatcher = updater.dispatcher
         
         # Add conversation handler with the states CHOOSING, TYPING_CHOICE and TYPING_REPLY
         profile_handler = self.profile_manager.conv_handler
-
+        create_meal_plan_handler = self.meal_plan_manager.conv_handler_create
+        
         dispatcher.add_handler(profile_handler)
-
+        dispatcher.add_handler(create_meal_plan_handler)
         # Start the Bot
         updater.start_polling()
 
@@ -242,6 +268,7 @@ class Bot:
         # SIGTERM or SIGABRT. This should be used most of the time, since
         # start_polling() is non-blocking and will stop the bot gracefully.
         updater.idle()
+
 
     
 

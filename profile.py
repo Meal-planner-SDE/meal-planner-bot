@@ -10,31 +10,31 @@ from telegram.ext import (
 from datetime import date
 
 class ProfileManager:
-    def __init__(self, db, logger):
+    def __init__(self, meal_planner, logger):
         self.BIRTH, self.WEIGHT, self.HEIGHT, self.SEX, self.DIET, self.ACTIVITY_FACTOR, \
             self.CHOOSING, self.TYPING_REPLY, TYPING_CHOICE = range(9)
-        self.db = db
+        self.meal_planner = meal_planner
         self.logger = logger
         self.sex_keyboard = [
             ['M', 'F', 'Other']
         ]
-        self.sex_markup = ReplyKeyboardMarkup(self.sex_keyboard, one_time_keyboard=True)
+        self.sex_markup = ReplyKeyboardMarkup(self.sex_keyboard, one_time_keyboard=True,  resize_keyboard=True)
 
         self.diet_keyboard = [
             ['Omnivorous', 'Vegetarian'],
             ['Vegan', 'Gluten free']
         ]
-        self.diet_markup = ReplyKeyboardMarkup(self.diet_keyboard, one_time_keyboard=True)
+        self.diet_markup = ReplyKeyboardMarkup(self.diet_keyboard, one_time_keyboard=True,  resize_keyboard=True)
 
 
         self.activity_keyboard = [
             ['Next?','A bit','Average'],
             ['Quite a lot', 'I\'m an athlete']
         ]
-        self.activity_markup = ReplyKeyboardMarkup(self.activity_keyboard, one_time_keyboard=True)
+        self.activity_markup = ReplyKeyboardMarkup(self.activity_keyboard, one_time_keyboard=True,  resize_keyboard=True)
 
         self.conv_handler = ConversationHandler(
-            entry_points=[CommandHandler('start', self.start)],
+            entry_points=[CommandHandler('start', self.start), CommandHandler('profile', self.start)],
             states={
                 self.BIRTH: [
                     MessageHandler(
@@ -168,7 +168,7 @@ What is your birth year?
             """,
             # reply_markup=markup,
         )
-
+        context.user_data['user'] = {}
         return self.BIRTH
 
 
@@ -182,21 +182,21 @@ What is your birth year?
             update.message.reply_text(error_str)
             return self.BIRTH
 
-        context.user_data['birth_year'] = birth_year
+        context.user_data['user']['birth_year'] = birth_year
         update.message.reply_text(f'Wonderful! Tell me your weight (in kg), please.')
         return self.WEIGHT
 
     def weight(self, update: Update, context: CallbackContext) -> int:
         text = update.message.text
         weight = int(text)
-        context.user_data['weight'] = weight
+        context.user_data['user']['weight'] = weight
         update.message.reply_text(f'Awesome! Tell me your height (in cm), please.')
         return self.HEIGHT
 
     def height(self, update: Update, context: CallbackContext) -> int:
         text = update.message.text
         height = int(text)
-        context.user_data['height'] = height
+        context.user_data['user']['height'] = height
         update.message.reply_text(f'Fabulous! Tell me your sex, please.',
             reply_markup=self.sex_markup)
         return self.SEX
@@ -204,7 +204,7 @@ What is your birth year?
     def sex(self, update: Update, context: CallbackContext) -> int:
         text = update.message.text
         sex = text.lower() if text in ['M', 'F'] else 'm'
-        context.user_data['sex'] = sex
+        context.user_data['user']['sex'] = sex
         update.message.reply_text(f'Brillant! What is your diet type?',
             reply_markup=self.diet_markup)
         return self.DIET
@@ -220,7 +220,7 @@ What is your birth year?
 
         text = update.message.text
         diet = diet_map[text]
-        context.user_data['diet_type'] = diet
+        context.user_data['user']['diet_type'] = diet
         update.message.reply_text(f'Stunning! How active would you define yourself?',
             reply_markup=self.activity_markup)
         return self.ACTIVITY_FACTOR
@@ -236,14 +236,14 @@ What is your birth year?
 
         text = update.message.text
         activity = activity_map[text]
-        context.user_data['activity_factor'] = activity
+        context.user_data['user']['activity_factor'] = activity
         
         update.message.reply_text(f'I\'m updating your profile...')
         
-        user = self.save_user(context.user_data, update)
-        
+        user = self.save_user(context.user_data['user'], update)
+        context.user_data['user'] = user
         update.message.reply_text(f'Magnificent! Your information have been saved correctly\n{user}')
-        context.user_data.clear()
+
         return ConversationHandler.END
 
     def save_user(self, user_data, update):
@@ -251,7 +251,7 @@ What is your birth year?
         user_data['username'] = user['username']
 
         self.logger.info(str(user_data))
-        return self.db.update_user(user_data)
+        return self.meal_planner.update_user(user_data)
 
     def done(self, update: Update, context: CallbackContext) -> int:
         user_data = context.user_data
