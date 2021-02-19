@@ -12,7 +12,7 @@ class MealPlanManager:
     MAX_DAYS = 10
     MAX_MEALS = 10
     N_DAYS, N_MEALS = range(2)
-    CHOOSE_MEAL_PLAN, CHOOSE_DAILY_PLAN = range(2)
+    CHOOSE_MEAL_PLAN, CHOOSE_DAILY_PLAN, CHOOSE_RECIPE = range(3)
     N_DAYS_KEYBOARD = [
         list(range(1, MAX_DAYS + 1))
     ]
@@ -48,11 +48,11 @@ class MealPlanManager:
         self.conv_handler_view = ConversationHandler(
             entry_points=[CommandHandler('viewmealplans', self.view_meal_plans)],
             states={
-                MealPlanManager.CHOOSE_MEAL_PLAN: [
-                    CallbackQueryHandler(self.choose_meal_plan),
-                ],
                 MealPlanManager.CHOOSE_DAILY_PLAN: [
                     CallbackQueryHandler(self.choose_daily_plan),
+                ],
+                MealPlanManager.CHOOSE_RECIPE: [
+                    CallbackQueryHandler(self.choose_recipe),
                 ],
             },
             fallbacks=[MessageHandler(Filters.regex('^Done$'), self.done)],
@@ -129,6 +129,7 @@ I'm working to make the meal plan of your dreams, it might take some time...
 
 
     def view_meal_plans(self, update, context):
+        update.message.reply_text("I'm collecting your meal plans, just a moment...")
         if not self.authenticate(update, context):
             return
         meal_plans = self.meal_planner.get_meal_plans(context.user_data['user'])
@@ -139,10 +140,34 @@ I'm working to make the meal plan of your dreams, it might take some time...
         ]
         markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text("Boo-ya, here are your meal plans:", reply_markup=markup)
-        return MealPlanManager.CHOOSE_MEAL_PLAN
+        return MealPlanManager.CHOOSE_DAILY_PLAN
+
     def choose_meal_plan(self, update, context):
-        return
+        meal_plans = context.user_data['user_meal_plans']
+        keyboard = [
+            [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} calories - {meal_plan['diet_type']}", callback_data=i)] 
+                for i, meal_plan in enumerate(meal_plans)
+        ]
+        markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text("Boo-ya, here are your meal plans:", reply_markup=markup)
+        return MealPlanManager.CHOOSE_DAILY_PLAN
+
     def choose_daily_plan(self, update, context):
+        query = update.callback_query
+        query.answer()
+        meal_plan = context.user_data['user_meal_plans'][int(query.data)]['daily_plans']
+        keyboard = [
+            [InlineKeyboardButton(f"#{daily_plan['daily_plan_number'] + 1:2d}", callback_data=i)] 
+                for i, daily_plan in enumerate(meal_plan)
+        ]
+        markup = InlineKeyboardMarkup(keyboard)
+        query.edit_message_text(
+            text="These are the daily plans of the meal plan chosen", reply_markup=markup
+        )
+        return MealPlanManager.CHOOSE_RECIPE
+
+    def choose_recipe(self, update, context):
+        
         return
 
     def done(self, update, context):
