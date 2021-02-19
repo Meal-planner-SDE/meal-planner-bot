@@ -1,4 +1,4 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup, ParseMode
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -8,14 +8,14 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
 )
-
+from markdownify import markdownify
 import utils
 
 class MealPlanManager:
     MAX_DAYS = 10
     MAX_MEALS = 10
     N_DAYS, N_MEALS = range(2)
-    CHOOSE_MEAL_PLAN, CHOOSE_DAILY_PLAN, CHOOSE_RECIPE = range(3)
+    CHOOSE_MEAL_PLAN, CHOOSE_DAILY_PLAN, CHOOSE_RECIPE, VIEW_RECIPE = range(4)
     N_DAYS_KEYBOARD = [
         list(range(1, MAX_DAYS + 1))
     ]
@@ -55,6 +55,9 @@ class MealPlanManager:
                 ],
                 MealPlanManager.CHOOSE_RECIPE: [
                     CallbackQueryHandler(self.choose_recipe),
+                ],
+                MealPlanManager.VIEW_RECIPE: [
+                    CallbackQueryHandler(self.view_recipe),
                 ],
             },
             fallbacks=[MessageHandler(Filters.regex('^Done$'), self.done)],
@@ -119,10 +122,11 @@ I'm working to make the meal plan of your dreams, it might take some time...
     def view_meal_plans(self, update, context):
         if not utils.authenticate(self.meal_planner, update, context):
             return
+        update.message.reply_text("I'm collecting your meal plans, just a moment...")
         meal_plans = self.meal_planner.get_meal_plans(context.user_data['user'])
         context.user_data['user_meal_plans'] = meal_plans
         keyboard = [
-            [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} calories - {meal_plan['diet_type']}", callback_data=i)] 
+            [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} calories - {meal_plan['diet_type']}", callback_data=i)]
                 for i, meal_plan in enumerate(meal_plans)
         ]
         markup = InlineKeyboardMarkup(keyboard)
@@ -132,7 +136,7 @@ I'm working to make the meal plan of your dreams, it might take some time...
     def choose_meal_plan(self, update, context):
         meal_plans = context.user_data['user_meal_plans']
         keyboard = [
-            [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} calories - {meal_plan['diet_type']}", callback_data=i)] 
+            [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} daily kcal - {meal_plan['diet_type']}", callback_data=i)] 
                 for i, meal_plan in enumerate(meal_plans)
         ]
         markup = InlineKeyboardMarkup(keyboard)
@@ -142,20 +146,68 @@ I'm working to make the meal plan of your dreams, it might take some time...
     def choose_daily_plan(self, update, context):
         query = update.callback_query
         query.answer()
-        meal_plan = context.user_data['user_meal_plans'][int(query.data)]['daily_plans']
+        meal_plan_i = int(query.data)
+        context.user_data['user_meal_plan_chosen'] = meal_plan_i
+        meal_plan = context.user_data['user_meal_plans'][meal_plan_i]
+        daily_plans = meal_plan['daily_plans']
         keyboard = [
             [InlineKeyboardButton(f"#{daily_plan['daily_plan_number'] + 1:2d}", callback_data=i)] 
-                for i, daily_plan in enumerate(meal_plan)
+                for i, daily_plan in enumerate(daily_plans)
         ]
         markup = InlineKeyboardMarkup(keyboard)
+
         query.edit_message_text(
-            text="These are the daily plans of the meal plan chosen", reply_markup=markup
+            text=f"""These are the daily plans of the meal number #{meal_plan_i + 1}.
+Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}    
+            """, reply_markup=markup
         )
         return MealPlanManager.CHOOSE_RECIPE
 
     def choose_recipe(self, update, context):
+        query = update.callback_query
+        query.answer()
+
+        daily_plan_i = int(query.data)
+        context.user_data['user_daily_plan_chosen'] = daily_plan_i
+
+        meal_plan_i = context.user_data['user_meal_plan_chosen']
+        daily_plan = context.user_data['user_meal_plans'][meal_plan_i]['daily_plans'][daily_plan_i]
+        query.edit_message_text(
+            text="I'm collecting the recipes of the day, just a moment..."
+        )
         
-        return
+        recipes_info = self.meal_planner.get_recipes_info(daily_plan['recipes'])
+        context.user_data['recipes'] = recipes_info
+
+        keyboard = [
+            [InlineKeyboardButton(f"{recipes_info[recipe['recipe_id']]['title']}", callback_data=recipe['recipe_id'])] 
+                for i, recipe in enumerate(daily_plan['recipes'])
+        ]
+        markup = InlineKeyboardMarkup(keyboard)
+        query.edit_message_text(
+            text=f"These are the recipes of day #{daily_plan_i + 1} of meal plan #{meal_plan_i + 1}", reply_markup=markup
+        )
+        return MealPlanManager.VIEW_RECIPE
+
+    def view_recipe(self, update, context):
+        query = update.callback_query
+        query.answer()
+        recipes_info = context.user_data['recipes']
+        daily_plan_i = context.user_data['user_daily_plan_chosen']
+        recipe_id = int(query.data)
+        keyboard = [
+            [InlineKeyboardButton(f"back", callback_data=1)]
+        ]
+        markup = InlineKeyboardMarkup(keyboard)
+        print((recipes_info[recipe_id]['instructions']))
+        print(markdownify(recipes_info[recipe_id]['instructions']))
+        query.edit_message_text(
+            text=f"""Let's have a look at {recipes_info[recipe_id]['title']}:
+            [​​​​​​​​​​​]({recipes_info[recipe_id]['image']})
+{markdownify(recipes_info[recipe_id]['instructions'])}
+            """, reply_markup=markup, parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
 
     def done(self, update, context):
         user_data = context.user_data

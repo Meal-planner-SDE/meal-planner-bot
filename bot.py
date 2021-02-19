@@ -194,6 +194,7 @@ TOKEN = "1585535684:AAFj6jKfe6Nud4unaRZwS5HXi5VrzbHFSrs"
 class MealPlanner:
     def __init__(self):
         self.meal_planner_url = "https://meal-plan-sde-meal-plan.herokuapp.com/"
+        self.shopping_list_url = "https://meal-plan-sde-shopping-list.herokuapp.com/"
 
     # Function to retrieve user by id from db
     def get_user(self, username):
@@ -238,8 +239,94 @@ class MealPlanner:
         meal_plans_list = requests.get(f"{self.meal_planner_url}users/{user['mp_user_id']}/mealPlans").json()
         return meal_plans_list
 
-    def add_meal_plan_to_shopping_list(self, user, meal_plan_id):
-        pass
+# MEAL PLAN FORMAT
+# {'meal_plan_id': 16, 
+# 'mp_user_id': 3, 
+# 'is_current': True, 
+# 'daily_calories': 2365, 
+# 'diet_type': 'vegan', 
+# 'daily_plans': [
+#     {'daily_plan_id': 41, 
+#     'daily_plan_number': 0, 
+#     'meal_plan_id': 16, 
+#     'recipes': [{'recipe_id': 716426}]
+#     }, 
+#     {'daily_plan_id': 40, 
+#     'daily_plan_number': 1, 
+#     'meal_plan_id': 16, 
+#     'recipes': [{'recipe_id': 715594}]
+#     }
+#   ]
+# }
+#
+# RECIPE FORMAT
+# { id: number;
+#   title: string;
+#   image: string;
+#   imageType: string;
+#   ingredients: [{
+    #     id: number;
+    #     name: string;
+    #     measures: {
+    #         metric: {
+            #       amount: number;
+            #       unitLong: string;
+            #       unitShort: string;
+            #   }
+    
+    #     };
+    # };
+    # ]
+#   summary: string;
+#   sourceUrl: string;
+#   servings: number;
+#   readyInMinutes: number;
+#   pricePerServing: number;
+#   glutenFree: boolean;
+#   vegan: boolean;
+#   vegetarian: boolean;
+#   instructions: string;
+# }
+
+# SHOPPING_LIST_ENTRY
+# {
+#     ingredient_id: number,
+#     quantity: number,
+#     measure: string
+# }
+    def add_meal_plan_to_shopping_list(self, user, meal_plan):
+        recipes = []
+        for daily_plan in meal_plan['daily_plans']:
+            for recipe in daily_plan['recipes']:
+                recipes.append(recipe)
+
+        recipes_info = self.get_recipes_info(recipes)
+        recipes = [recipe for recipe in recipes_info.values()]
+        print("got all recipes info")
+        print(recipes)
+        shopping_list_entries = []
+        for recipe in recipes:
+            for ingredient in recipe['ingredients']:
+                shopping_list_entries.append({
+                    "ingredient_id": ingredient['id'],
+                    "ingredient_name": ingredient['name'],
+                    "quantity": ingredient['measures']['metric']['amount'],
+                    "measure": ingredient['measures']['metric']['unitLong']
+                })
+
+        # print("got all shopping_list_entries: ", shopping_list_entries)
+        final_shopping_list = requests.patch(f"{self.shopping_list_url}users/{user['mp_user_id']}/shoppingList", json=shopping_list_entries).json()
+        print("done")
+        return final_shopping_list
+
+    def get_recipes_info(self, recipes):
+        recipes_info = {}
+        for recipe in recipes:
+            rid = recipe['recipe_id']
+            if not rid in recipe:
+                rinfo = requests.get(f"{self.shopping_list_url}recipes/{recipe['recipe_id']}").json()
+                recipes_info[rid] = rinfo
+        return recipes_info
 
     def is_error(self, obj):
         return "error" in obj
@@ -261,14 +348,15 @@ class Bot:
         
         # Get the dispatcher to register handlers
         dispatcher = updater.dispatcher
-        
         # Add conversation handler with the states CHOOSING, TYPING_CHOICE and TYPING_REPLY
         profile_handler = self.profile_manager.conv_handler
         create_meal_plan_handler = self.meal_plan_manager.conv_handler_create
         view_meal_plans_handler = self.meal_plan_manager.conv_handler_view
+        mp_to_sl_handler = self.shopping_list_manager.conv_handler_meal_plan_to_shopping_list
         dispatcher.add_handler(profile_handler)
         dispatcher.add_handler(create_meal_plan_handler)
         dispatcher.add_handler(view_meal_plans_handler)
+        dispatcher.add_handler(mp_to_sl_handler)
         
         # Start the Bot
         updater.start_polling()
