@@ -169,7 +169,7 @@
 # if __name__ == '__main__':
 #     bot = Bot()
 import logging
-import profile, meal_plan
+import profile, meal_plan, shopping_list
 import requests
 from typing import Dict
 from datetime import date
@@ -252,7 +252,7 @@ class Bot:
         self.logger = logging.getLogger(__name__)
         self.profile_manager = profile.ProfileManager(self.meal_planner, self.logger)
         self.meal_plan_manager = meal_plan.MealPlanManager(self.meal_planner, self.logger)
-        self.shopping_list_manager = meal_plan.ShoppingListManager(self.meal_planner, self. logger)
+        self.shopping_list_manager = shopping_list.ShoppingListManager(self.meal_planner, self.logger)
 
 
     def start(self) -> None:

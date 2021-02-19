@@ -8,6 +8,9 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
 )
+
+import utils
+
 class MealPlanManager:
     MAX_DAYS = 10
     MAX_MEALS = 10
@@ -22,7 +25,6 @@ class MealPlanManager:
         list(range(1, MAX_DAYS + 1))
     ]
     N_MEALS_MARKUP = ReplyKeyboardMarkup(N_MEALS_KEYBOARD, one_time_keyboard=True, resize_keyboard=True)
-    
 
     def __init__(self, meal_planner, logger):
         self.meal_planner = meal_planner
@@ -58,22 +60,8 @@ class MealPlanManager:
             fallbacks=[MessageHandler(Filters.regex('^Done$'), self.done)],
         )
 
-    def is_error(self, obj):
-        return "error" in obj
-
-    def authenticate(self, update, context):
-        if not 'user' in context.user_data:
-            user = self.meal_planner.get_user(update.message.chat.username)
-            if self.is_error(user):
-                update.message.reply_text(
-                    """Ups, it seems I do not know you yet. Please type /start to present yourself."""
-                )
-                return False
-            else:
-                context.user_data['user'] = user
-                return True
     def new_meal_plan(self, update, context):
-        if not self.authenticate(update, context):
+        if not utils.authenticate(self.meal_planner, update, context):
             return
         context.user_data['new_meal_plan'] = {}
         update.message.reply_text(
@@ -129,7 +117,7 @@ I'm working to make the meal plan of your dreams, it might take some time...
 
 
     def view_meal_plans(self, update, context):
-        if not self.authenticate(update, context):
+        if not utils.authenticate(self.meal_planner, update, context):
             return
         meal_plans = self.meal_planner.get_meal_plans(context.user_data['user'])
         context.user_data['user_meal_plans'] = meal_plans
