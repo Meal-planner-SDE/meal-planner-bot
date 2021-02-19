@@ -299,11 +299,8 @@ class MealPlanner:
         for daily_plan in meal_plan['daily_plans']:
             for recipe in daily_plan['recipes']:
                 recipes.append(recipe)
-
         recipes_info = self.get_recipes_info(recipes)
         recipes = [recipe for recipe in recipes_info.values()]
-        print("got all recipes info")
-        print(recipes)
         shopping_list_entries = []
         for recipe in recipes:
             for ingredient in recipe['ingredients']:
@@ -314,10 +311,15 @@ class MealPlanner:
                     "measure": ingredient['measures']['metric']['unitLong']
                 })
 
-        # print("got all shopping_list_entries: ", shopping_list_entries)
         final_shopping_list = requests.patch(f"{self.shopping_list_url}users/{user['mp_user_id']}/shoppingList", json=shopping_list_entries).json()
-        print("done")
         return final_shopping_list
+
+    def get_user_shopping_list(self, user):
+        return requests.get(f"{self.shopping_list_url}users/{user['mp_user_id']}/shoppingList").json()
+
+    def remove_ingredient_from_shopping_list(self, user, ingredient):
+        return requests.patch(f"{self.shopping_list_url}users/{user['mp_user_id']}/shoppingList", json=ingredient).json()
+        
 
     def get_recipes_info(self, recipes):
         recipes_info = {}
@@ -353,10 +355,12 @@ class Bot:
         create_meal_plan_handler = self.meal_plan_manager.conv_handler_create
         view_meal_plans_handler = self.meal_plan_manager.conv_handler_view
         mp_to_sl_handler = self.shopping_list_manager.conv_handler_meal_plan_to_shopping_list
+        show_shopping_list_handler = self.shopping_list_manager.conv_handler_show_shopping_list
         dispatcher.add_handler(profile_handler)
         dispatcher.add_handler(create_meal_plan_handler)
         dispatcher.add_handler(view_meal_plans_handler)
         dispatcher.add_handler(mp_to_sl_handler)
+        dispatcher.add_handler(show_shopping_list_handler)
         
         # Start the Bot
         updater.start_polling()

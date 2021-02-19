@@ -114,7 +114,7 @@ class ProfileManager:
                 #     )
                 # ],
             },
-            fallbacks=[MessageHandler(Filters.regex('^Done$'), self.done)],
+            fallbacks=[MessageHandler(Filters.command | Filters.regex('^Done$'), self.done)],
         )
 
     def identify_user(self, chat):
@@ -246,21 +246,20 @@ What is your birth year?
 
         return ConversationHandler.END
 
-    def save_user(self, user_data, update):
-        user = self.identify_user(update.message.chat)
-        user_data['username'] = user['username']
+    def save_user(self, user, update):
+        chat_user = self.identify_user(update.message.chat)
+        user['username'] = chat_user['username']
 
-        self.logger.info(str(user_data))
-        return self.meal_planner.update_user(user_data)
+        self.logger.info(str(user))
+        return self.meal_planner.update_user(user)
 
     def done(self, update: Update, context: CallbackContext) -> int:
         user_data = context.user_data
-        if 'choice' in user_data:
-            del user_data['choice']
+        if 'user' in user_data:
+            del user_data['user']
 
         update.message.reply_text(
-            f"I learned these facts about you: {(user_data)} Until next time!"
+            f"Uh-oh, it seems like you weren't able to complete the process. See you soon."
         )
 
-        user_data.clear()
         return ConversationHandler.END

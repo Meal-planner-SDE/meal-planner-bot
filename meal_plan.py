@@ -45,22 +45,25 @@ class MealPlanManager:
                     ),
                 ],
             },
-            fallbacks=[MessageHandler(Filters.regex('^Done$'), self.done)],
+            fallbacks=[MessageHandler(Filters.command | Filters.regex('^Done$'), self.done)],
         )
         self.conv_handler_view = ConversationHandler(
-            entry_points=[CommandHandler('viewmealplans', self.view_meal_plans)],
+            entry_points=[CommandHandler('viewmealplans', self.choose_meal_plan)],
             states={
                 MealPlanManager.CHOOSE_DAILY_PLAN: [
-                    CallbackQueryHandler(self.choose_daily_plan),
+                    CallbackQueryHandler(self.choose_daily_plan, pattern='^((?!exit|back_.*).)*$'),
+                    CallbackQueryHandler(self.back_exit, pattern='^(exit|back_.*)$'),
                 ],
                 MealPlanManager.CHOOSE_RECIPE: [
-                    CallbackQueryHandler(self.choose_recipe),
+                    CallbackQueryHandler(self.choose_recipe, pattern='^((?!exit|back_.*).)*$'),
+                    CallbackQueryHandler(self.back_exit, pattern='^(exit|back_.*)$'),
                 ],
                 MealPlanManager.VIEW_RECIPE: [
-                    CallbackQueryHandler(self.view_recipe),
+                    CallbackQueryHandler(self.view_recipe, pattern='^((?!exit|back_.*).)*$'),
+                    CallbackQueryHandler(self.back_exit, pattern='^(exit|back_.*)$'),
                 ],
             },
-            fallbacks=[MessageHandler(Filters.regex('^Done$'), self.done)],
+            fallbacks=[MessageHandler(Filters.command | Filters.regex('^Done$'), self.done)],
         )
 
     def new_meal_plan(self, update, context):
@@ -119,29 +122,32 @@ I'm working to make the meal plan of your dreams, it might take some time...
         return ConversationHandler.END
 
 
-    def view_meal_plans(self, update, context):
+    def choose_meal_plan(self, update, context):
         if not utils.authenticate(self.meal_planner, update, context):
             return
-        update.message.reply_text("I'm collecting your meal plans, just a moment...")
-        meal_plans = self.meal_planner.get_meal_plans(context.user_data['user'])
-        context.user_data['user_meal_plans'] = meal_plans
+        
+        if not 'user_meal_plans' in context.user_data:
+            message_fn = update.message.reply_text
+            message_fn("I'm collecting your meal plans, just a moment...")
+            meal_plans = self.meal_planner.get_meal_plans(context.user_data['user'])
+            context.user_data['user_meal_plans'] = meal_plans
+        else:
+            query = update.callback_query
+            message_fn = query.edit_message_text
+            message_fn("I'm collecting your meal plans, just a moment...")
+            meal_plans = context.user_data['user_meal_plans']
         keyboard = [
             [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} calories - {meal_plan['diet_type']}", callback_data=i)]
                 for i, meal_plan in enumerate(meal_plans)
         ]
+        keyboard.extend([
+            [InlineKeyboardButton("Exit", callback_data="exit")]
+        ])
         markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_text("Boo-ya, here are your meal plans:", reply_markup=markup)
+        
+        message_fn("Boo-ya, here are your meal plans:", reply_markup=markup)
         return MealPlanManager.CHOOSE_DAILY_PLAN
 
-    def choose_meal_plan(self, update, context):
-        meal_plans = context.user_data['user_meal_plans']
-        keyboard = [
-            [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} daily kcal - {meal_plan['diet_type']}", callback_data=i)] 
-                for i, meal_plan in enumerate(meal_plans)
-        ]
-        markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_text("Boo-ya, here are your meal plans:", reply_markup=markup)
-        return MealPlanManager.CHOOSE_DAILY_PLAN
 
     def choose_daily_plan(self, update, context):
         query = update.callback_query
@@ -154,6 +160,10 @@ I'm working to make the meal plan of your dreams, it might take some time...
             [InlineKeyboardButton(f"#{daily_plan['daily_plan_number'] + 1:2d}", callback_data=i)] 
                 for i, daily_plan in enumerate(daily_plans)
         ]
+        keyboard.extend([
+            [InlineKeyboardButton("Back", callback_data=f"back_mp_0")],
+            [InlineKeyboardButton("Exit", callback_data="exit")]
+        ])
         markup = InlineKeyboardMarkup(keyboard)
 
         query.edit_message_text(
@@ -177,12 +187,20 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}
         )
         
         recipes_info = self.meal_planner.get_recipes_info(daily_plan['recipes'])
-        context.user_data['recipes'] = recipes_info
+        context.user_data['user_recipes'] = recipes_info
+        # if not 'user_recipes' in context.user_data:
+        # else:
+        #     recipes_info = context.user_data['user_recipes']
 
         keyboard = [
             [InlineKeyboardButton(f"{recipes_info[recipe['recipe_id']]['title']}", callback_data=recipe['recipe_id'])] 
-                for i, recipe in enumerate(daily_plan['recipes'])
+                for recipe in daily_plan['recipes']
         ]
+        
+        keyboard.extend([
+            [InlineKeyboardButton("Back", callback_data=f"back_dp_{meal_plan_i}")],
+            [InlineKeyboardButton("Exit", callback_data="exit")]
+        ])
         markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text(
             text=f"These are the recipes of day #{daily_plan_i + 1} of meal plan #{meal_plan_i + 1}", reply_markup=markup
@@ -192,33 +210,66 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}
     def view_recipe(self, update, context):
         query = update.callback_query
         query.answer()
-        recipes_info = context.user_data['recipes']
+        recipes_info = context.user_data['user_recipes']
         daily_plan_i = context.user_data['user_daily_plan_chosen']
         recipe_id = int(query.data)
-        keyboard = [
-            [InlineKeyboardButton(f"back", callback_data=1)]
-        ]
+        keyboard = []
+        keyboard.extend([
+            [InlineKeyboardButton("Back", callback_data=f"back_rp_{daily_plan_i}")],
+            [InlineKeyboardButton("Exit", callback_data="exit")]
+        ])
         markup = InlineKeyboardMarkup(keyboard)
-        print((recipes_info[recipe_id]['instructions']))
-        print(markdownify(recipes_info[recipe_id]['instructions']))
+        # print((recipes_info[recipe_id]['instructions']))
+        # print(markdownify(recipes_info[recipe_id]['instructions']))
+        instructions = "I wasn't able to find any instructions for this recipe. You'll have to be creative I guess."
+        image = ""
+        if recipes_info[recipe_id]['instructions']:
+            instructions = recipes_info[recipe_id]['instructions']
+        if recipes_info[recipe_id]['image']:
+            image = f"[​​​​​​​​​​​]({recipes_info[recipe_id]['image']})"
         query.edit_message_text(
             text=f"""Let's have a look at {recipes_info[recipe_id]['title']}:
-            [​​​​​​​​​​​]({recipes_info[recipe_id]['image']})
-{markdownify(recipes_info[recipe_id]['instructions'])}
+            {image}
+{markdownify(instructions)}
             """, reply_markup=markup, parse_mode=ParseMode.MARKDOWN
         )
-        return ConversationHandler.END
+        return 
 
-    def done(self, update, context):
+    def back_exit(self, update, context):
+        query = update.callback_query
+        query.answer()
+        action = query.data
+        if action == 'exit':
+            return self.menu_exit(update, context)
+        _, action, data = action.split('_')
+        query.data = data
+        if action == 'mp':
+            return self.choose_meal_plan(update, context)
+        if action == 'dp':
+            return self.choose_daily_plan(update, context)
+        if action == 'rp':
+            return self.choose_recipe(update, context)
+
+    def done(self, update: Update, context: CallbackContext) -> int:
         user_data = context.user_data
-        if 'choice' in user_data:
-            del user_data['choice']
+        attributes = ['new_meal_plan', 'user_meal_plans', 'user_meal_plan_chosen', 'user_daily_plan_chosen', 'user_recipes']
+        for attribute in attributes:
+            if attribute in user_data:
+                del user_data[attribute]
 
         update.message.reply_text(
-            f"I learned these facts about you: {(user_data)} Until next time!"
+            f"Uh-oh, it seems like you weren't able to complete the process. See you soon."
         )
 
-        user_data.clear()
         return ConversationHandler.END
 
-    
+    def menu_exit(self, update, context):
+        user_data = context.user_data
+        attributes = ['new_meal_plan', 'user_meal_plans', 'user_meal_plan_chosen', 'user_daily_plan_chosen', 'user_recipes']
+        for attribute in attributes:
+            if attribute in user_data:
+                del user_data[attribute]
+        query = update.callback_query
+        query.answer()
+        query.edit_message_text("Whoopee, see you later!", reply_markup = None)
+        return ConversationHandler.END
