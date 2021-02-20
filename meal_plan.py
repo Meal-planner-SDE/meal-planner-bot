@@ -222,13 +222,15 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}
         # print((recipes_info[recipe_id]['instructions']))
         # print(markdownify(recipes_info[recipe_id]['instructions']))
         instructions = "I wasn't able to find any instructions for this recipe. You'll have to be creative I guess."
+        recipe = recipes_info[recipe_id]
         image = ""
-        if recipes_info[recipe_id]['instructions']:
-            instructions = recipes_info[recipe_id]['instructions']
-        if recipes_info[recipe_id]['image']:
-            image = f"[​​​​​​​​​​​]({recipes_info[recipe_id]['image']})"
+        if recipe['instructions']:
+            instructions = recipe['instructions']
+        if 'image' in recipe:
+            if recipe['image']:
+                image = f"[​​​​​​​​​​​]({recipe['image']})"
         query.edit_message_text(
-            text=f"""Let's have a look at {recipes_info[recipe_id]['title']}:
+            text=f"""Let's have a look at {recipe['title']}:
             {image}
 {markdownify(instructions)}
             """, reply_markup=markup, parse_mode=ParseMode.MARKDOWN
