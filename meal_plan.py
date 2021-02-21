@@ -224,7 +224,7 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}
         instructions = "I wasn't able to find any instructions for this recipe. You'll have to be creative I guess."
         recipe = recipes_info[recipe_id]
         image = ""
-        if recipe['instructions']:
+        if 'instructions' in recipe:
             instructions = recipe['instructions']
         if 'image' in recipe:
             if recipe['image']:

@@ -1,4 +1,4 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup, ParseMode
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, KeyboardButton, ReplyKeyboardMarkup, ParseMode
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -12,15 +12,20 @@ from markdownify import markdownify
 import utils
 
 class ShopsManager:
-    CHOOSE_SHOP_CATEGORY, CHOOSE_CATEGORY_SHOP = range(2)
+    SHOPS, CHOOSE_SHOP_CATEGORY, CHOOSE_CATEGORY_SHOP = range(3)
    
     def __init__(self, meal_planner, logger):
         self.meal_planner = meal_planner
         self.logger = logger
 
         self.conv_handler = ConversationHandler(
-            entry_points=[CommandHandler('shops', self.shops)],
+            entry_points=[CommandHandler('shops', self.location)],
             states={
+                ShopsManager.SHOPS: [
+                    MessageHandler(Filters.location, self.shops),
+                    # CallbackQueryHandler(, pattern='^((?!exit|back_.*).)*$'),
+                    CallbackQueryHandler(self.back_exit, pattern='^(exit|back_.*)$'),
+                ],
                 ShopsManager.CHOOSE_SHOP_CATEGORY: [
                     CallbackQueryHandler(self.choose_shop_category, pattern='^((?!exit|back_.*).)*$'),
                     CallbackQueryHandler(self.back_exit, pattern='^(exit|back_.*)$'),
@@ -46,17 +51,35 @@ class ShopsManager:
         print("Categories:", categories)
 
         keyboard = [
-            [InlineKeyboardButton(text=f"{category['category'].capitalize()}", callback_data=category['category'])]
-            for category in categories
+            [InlineKeyboardButton(text=f"{category['category'].capitalize()}", callback_data=i)]
+            for i, category in enumerate(categories)
         ]
         keyboard.append([InlineKeyboardButton(text="Exit", callback_data="exit")])
         return InlineKeyboardMarkup(keyboard)
+    
+    def location(self, update, context):
+        keyboard = [
+            [KeyboardButton(text="Share location", request_location=True)],
+            # [ReplyKeyboardButton(text="Exit", callback_data="exit")],
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
+        update.message.reply_text("""Yo-ho-ho, is it already time to do the shopping?
+To help you find the shops, I need to know you location.""", reply_markup=reply_markup)
+        return ShopsManager.SHOPS
 
     def shops(self, update, context):
         if not utils.authenticate(self.meal_planner, update, context):
             return
-        context.user_data['new_meal_plan'] = {}
-        update.message.reply_text(
+        user = context.user_data['user']
+        if update.message:
+            user['lat'] = update.message.location.latitude
+            user['lon'] = update.message.location.longitude
+            message_fn = update.message.reply_text
+        else:
+            query = update.callback_query
+            query.answer()
+            message_fn = query.edit_message_text
+        message_fn(
             """Yo-ho-ho, is it already time to do the shopping?
 Here are the categories of ingredients in you shopping list, choose \
 one to see which ingredients are there and where you can purchase 'em.
@@ -77,77 +100,71 @@ one to see which ingredients are there and where you can purchase 'em.
         else:
             shops = context.user_data['shops']
         print(shops)
-        for shop in shops:
-            if shop['category'] == category:
-                category_shops = shop
+        for shop_category in shops:
+            if shop_category['category'] == category:
+                category_shops = shop_category['shops'];
                 break
         else:
-            return InlineKeyboardMarkup([])
+            keyboard = []
+            keyboard.append([InlineKeyboardButton(text="Back", callback_data="back_categories_0")])
+            keyboard.append([InlineKeyboardButton(text="Exit", callback_data="exit")])
+            return InlineKeyboardMarkup(keyboard)
 
         keyboard = [
             [InlineKeyboardButton(text=f"{shop['name'] if 'name' in shop else shop['shop']}", callback_data=i)]
-            for i,shop in enumerate(category_shops)
+            for i, shop in enumerate(category_shops)
         ]
 
-        keyboard.append([InlineKeyboardButton(text="Back", callback_data="exit")])
+        keyboard.append([InlineKeyboardButton(text="Back", callback_data="back_categories_0")])
         keyboard.append([InlineKeyboardButton(text="Exit", callback_data="exit")])
+        
         return InlineKeyboardMarkup(keyboard)
    
     def choose_shop_category(self, update, context):
         user = context.user_data['user']
 
-        if not user['address']:
-            user['lat'] = 46.0664228
-            user['lon'] = 11.1257601
+        # if not user['address']:
+        #     user['lat'] = 46.0664228
+        #     user['lon'] = 11.1257601
 
         query = update.callback_query
-        category_name = query.data
+        category_i = int(query.data)
         categories = context.user_data['categories']
-        for c in categories:
-            if c['category'] == category_name:
-                    category = c
-                    break
-        else:
-            query.edit_message_text(f"Ups, no items appear to be found in this category,\
-I'm sorry for the inconvenient")
-            return ConversationHandler.END
+        category = categories[category_i]
+        context.user_data['category_chosen'] = category_i
+
         # category = list(filter(lambda x : x['category'] == category_name, categories))[0]
         ingredients = category['ingredients']
         ingredients_list = '\n'.join(f"\- {ingredient['name']}" for ingredient in ingredients)
-        markup = self.get_shops_keyboard(update, context, category_name)
+        markup = self.get_shops_keyboard(update, context, category['category'])
         query.edit_message_text(f"""
-These are the items of category '{category_name}' in your shopping list:
+These are the items of category '{category['category']}' in your shopping list:
 {ingredients_list}
 
 I found the following shops where I think you could buy them, check 'em out\.
         """, reply_markup = markup, parse_mode = ParseMode.MARKDOWN_V2)
 
-        return ConversationHandler.END
+        return ShopsManager.CHOOSE_CATEGORY_SHOP
 
 
     def choose_category_shop(self, update, context):
         query = update.callback_query
         query.answer()
-        meal_plan_i = int(query.data)
-        context.user_data['user_meal_plan_chosen'] = meal_plan_i
-        meal_plan = context.user_data['user_meal_plans'][meal_plan_i]
-        daily_plans = meal_plan['daily_plans']
-        keyboard = [
-            [InlineKeyboardButton(f"#{daily_plan['daily_plan_number'] + 1:2d}", callback_data=i)] 
-                for i, daily_plan in enumerate(daily_plans)
-        ]
-        keyboard.extend([
-            [InlineKeyboardButton("Back", callback_data=f"back_mp_0")],
-            [InlineKeyboardButton("Exit", callback_data="exit")]
-        ])
-        markup = InlineKeyboardMarkup(keyboard)
+        shop_i = int(query.data)
+        category_i = int(context.user_data['category_chosen'])
+        print(f"Chosen shop {shop_i} of category nr. {category_i}")
+        shop_categories = context.user_data['shops']
+        print(shop_categories)
+        shop = shop_categories[category_i]['shops'][shop_i]
+        lat = shop['lat']
+        lon = shop['lon']
+        name = shop['name']
 
-        query.edit_message_text(
-            text=f"""These are the daily plans of the meal number #{meal_plan_i + 1}.
-Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}    
-            """, reply_markup=markup
-        )
-        return ShopsManager.CHOOSE_RECIPE
+        # query.data = category_i
+        category_name = shop_categories[category_i]['category']
+        query.edit_message_text(f"{name} is here!", reply_markup = self.get_shops_keyboard(update, context, category_name))
+        query.message.reply_location(latitude = lat, longitude = lon)
+        return ShopsManager.CHOOSE_CATEGORY_SHOP
 
     
     def back_exit(self, update, context):
@@ -158,16 +175,17 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}
             return self.menu_exit(update, context)
         _, action, data = action.split('_')
         query.data = data
-        if action == 'mp':
-            return self.choose_meal_plan(update, context)
-        if action == 'dp':
-            return self.choose_daily_plan(update, context)
-        if action == 'rp':
-            return self.choose_recipe(update, context)
-
+        # if action == 'mp':
+        #     return self.choose_meal_plan(update, context)
+        # if action == 'dp':
+        #     return self.choose_daily_plan(update, context)
+        # if action == 'rp':
+        #     return self.choose_recipe(update, context)
+        if action == 'categories':
+            return self.shops(update, context)
     def done(self, update: Update, context: CallbackContext) -> int:
         user_data = context.user_data
-        attributes = ['new_meal_plan', 'user_meal_plans', 'user_meal_plan_chosen', 'user_daily_plan_chosen', 'user_recipes']
+        attributes = ['shops', 'categories', 'category_chosen']
         for attribute in attributes:
             if attribute in user_data:
                 del user_data[attribute]
@@ -180,7 +198,7 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}
 
     def menu_exit(self, update, context):
         user_data = context.user_data
-        attributes = ['shops', 'categories']
+        attributes = ['shops', 'categories', 'category_chosen']
         for attribute in attributes:
             if attribute in user_data:
                 del user_data[attribute]

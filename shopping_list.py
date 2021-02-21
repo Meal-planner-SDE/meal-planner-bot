@@ -300,7 +300,7 @@ Let's find out which recipes will be in your menu then!
 
         instructions = "I wasn't able to find any instructions for this recipe. You'll have to be creative I guess."
         image = ""
-        if recipe['instructions']:
+        if 'instructions' in recipe:
             instructions = recipe['instructions']
         if 'image' in recipe:
             if recipe['image']:
