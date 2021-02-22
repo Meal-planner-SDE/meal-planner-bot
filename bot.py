@@ -399,7 +399,8 @@ class Bot:
         # Get the dispatcher to register handlers
         dispatcher = updater.dispatcher
         # Add conversation handler with the states CHOOSING, TYPING_CHOICE and TYPING_REPLY
-        profile_handler = self.profile_manager.conv_handler
+        edit_profile_handler = self.profile_manager.conv_handler_edit
+        show_profile_handler = self.profile_manager.conv_handler_show
         create_meal_plan_handler = self.meal_plan_manager.conv_handler_create
         view_meal_plans_handler = self.meal_plan_manager.conv_handler_view
         mp_to_sl_handler = self.shopping_list_manager.conv_handler_meal_plan_to_shopping_list
@@ -407,14 +408,19 @@ class Bot:
         search_recipes_handler = self.shopping_list_manager.conv_handler_search_recipes
         show_user_recipes_handler = self.shopping_list_manager.conv_handler_show_user_recipes
         shops_handler = self.shops_manager.conv_handler
-        dispatcher.add_handler(profile_handler)
-        dispatcher.add_handler(create_meal_plan_handler)
-        dispatcher.add_handler(view_meal_plans_handler)
-        dispatcher.add_handler(mp_to_sl_handler)
-        dispatcher.add_handler(show_shopping_list_handler)
-        dispatcher.add_handler(search_recipes_handler)
-        dispatcher.add_handler(show_user_recipes_handler)
-        dispatcher.add_handler(shops_handler)
+        handlers = [
+            edit_profile_handler,
+            show_profile_handler,
+            create_meal_plan_handler,
+            view_meal_plans_handler,
+            mp_to_sl_handler,
+            show_shopping_list_handler,
+            search_recipes_handler,
+            show_user_recipes_handler,
+            shops_handler,
+        ]
+        for i, handler in enumerate(handlers):
+            dispatcher.add_handler(handler, i+1)
         
         # Start the Bot
         updater.start_polling()

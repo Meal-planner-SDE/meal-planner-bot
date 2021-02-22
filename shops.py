@@ -22,17 +22,17 @@ class ShopsManager:
             entry_points=[CommandHandler('shops', self.location)],
             states={
                 ShopsManager.SHOPS: [
-                    MessageHandler(Filters.location, self.shops),
+                    MessageHandler(Filters.location & ~(Filters.command | Filters.regex('^Done$')), self.shops),
                     # CallbackQueryHandler(, pattern='^((?!exit|back_.*).)*$'),
                     CallbackQueryHandler(self.back_exit, pattern='^(exit|back_.*)$'),
                 ],
                 ShopsManager.CHOOSE_SHOP_CATEGORY: [
-                    CallbackQueryHandler(self.choose_shop_category, pattern='^((?!exit|back_.*).)*$'),
                     CallbackQueryHandler(self.back_exit, pattern='^(exit|back_.*)$'),
+                    CallbackQueryHandler(self.choose_shop_category, pattern='^((?!exit|back_.*).)*$'),
                 ],
                 ShopsManager.CHOOSE_CATEGORY_SHOP: [
-                    CallbackQueryHandler(self.choose_category_shop, pattern='^((?!exit|back_.*).)*$'),
                     CallbackQueryHandler(self.back_exit, pattern='^(exit|back_.*)$'),
+                    CallbackQueryHandler(self.choose_category_shop, pattern='^((?!exit|back_.*).)*$'),
                 ],
             },
             fallbacks=[MessageHandler(Filters.command | Filters.regex('^Done$'), self.done)],
@@ -41,6 +41,7 @@ class ShopsManager:
     def get_categories_keyboard(self, update, context):
         if not 'categories' in context.user_data:
             user = context.user_data['user']
+            print(user)
             user_shopping_list = self.meal_planner.get_user_shopping_list(user)
             print("shopping list:", user_shopping_list)
             categories = self.meal_planner.group_ingredients(user_shopping_list)
@@ -58,6 +59,9 @@ class ShopsManager:
         return InlineKeyboardMarkup(keyboard)
     
     def location(self, update, context):
+        print('location called')
+        if not utils.authenticate(self.meal_planner, update, context):
+            return
         keyboard = [
             [KeyboardButton(text="Share location", request_location=True)],
             # [ReplyKeyboardButton(text="Exit", callback_data="exit")],
@@ -68,8 +72,8 @@ To help you find the shops, I need to know you location.""", reply_markup=reply_
         return ShopsManager.SHOPS
 
     def shops(self, update, context):
-        if not utils.authenticate(self.meal_planner, update, context):
-            return
+        print('shops called')
+        
         user = context.user_data['user']
         if update.message:
             user['lat'] = update.message.location.latitude
@@ -121,6 +125,8 @@ one to see which ingredients are there and where you can purchase 'em.
         return InlineKeyboardMarkup(keyboard)
    
     def choose_shop_category(self, update, context):
+        print('shops category called')
+
         user = context.user_data['user']
 
         # if not user['address']:
@@ -148,6 +154,8 @@ I found the following shops where I think you could buy them, check 'em out\.
 
 
     def choose_category_shop(self, update, context):
+        print('category shops called')
+
         query = update.callback_query
         query.answer()
         shop_i = int(query.data)
@@ -162,12 +170,21 @@ I found the following shops where I think you could buy them, check 'em out\.
 
         # query.data = category_i
         category_name = shop_categories[category_i]['category']
-        query.edit_message_text(f"{name} is here!", reply_markup = self.get_shops_keyboard(update, context, category_name))
+        query.message.reply_text(f"{name} is here!")
         query.message.reply_location(latitude = lat, longitude = lon)
+        query.reply_text(f"""
+These are the items of category '{category['category']}' in your shopping list:
+{ingredients_list}
+
+I found the following shops where I think you could buy them, check 'em out\.
+        """, reply_markup = self.get_shops_keyboard(update, context, category_name))
+
         return ShopsManager.CHOOSE_CATEGORY_SHOP
 
     
     def back_exit(self, update, context):
+        print('back exit called')
+
         query = update.callback_query
         query.answer()
         action = query.data
@@ -184,6 +201,8 @@ I found the following shops where I think you could buy them, check 'em out\.
         if action == 'categories':
             return self.shops(update, context)
     def done(self, update: Update, context: CallbackContext) -> int:
+        print('done called')
+
         user_data = context.user_data
         attributes = ['shops', 'categories', 'category_chosen']
         for attribute in attributes:
@@ -197,6 +216,8 @@ I found the following shops where I think you could buy them, check 'em out\.
         return ConversationHandler.END
 
     def menu_exit(self, update, context):
+        print('exit called')
+
         user_data = context.user_data
         attributes = ['shops', 'categories', 'category_chosen']
         for attribute in attributes:

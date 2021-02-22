@@ -48,7 +48,7 @@ class MealPlanManager:
             fallbacks=[MessageHandler(Filters.command | Filters.regex('^Done$'), self.done)],
         )
         self.conv_handler_view = ConversationHandler(
-            entry_points=[CommandHandler('viewmealplans', self.choose_meal_plan)],
+            entry_points=[CommandHandler('mealplans', self.choose_meal_plan)],
             states={
                 MealPlanManager.CHOOSE_DAILY_PLAN: [
                     CallbackQueryHandler(self.choose_daily_plan, pattern='^((?!exit|back_.*).)*$'),
@@ -137,7 +137,8 @@ I'm working to make the meal plan of your dreams, it might take some time...
             message_fn("I'm collecting your meal plans, just a moment...")
             meal_plans = context.user_data['user_meal_plans']
         keyboard = [
-            [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} calories - {meal_plan['diet_type']}", callback_data=i)]
+            [InlineKeyboardButton(f"{i+1:2d}. \
+            {meal_plan['daily_calories']} calories - {utils.get_diet_type(meal_plan['diet_type'])}", callback_data=i)]
                 for i, meal_plan in enumerate(meal_plans)
         ]
         keyboard.extend([
@@ -157,7 +158,7 @@ I'm working to make the meal plan of your dreams, it might take some time...
         meal_plan = context.user_data['user_meal_plans'][meal_plan_i]
         daily_plans = meal_plan['daily_plans']
         keyboard = [
-            [InlineKeyboardButton(f"#{daily_plan['daily_plan_number'] + 1:2d}", callback_data=i)] 
+            [InlineKeyboardButton(f"Day {daily_plan['daily_plan_number'] + 1:2d}", callback_data=i)] 
                 for i, daily_plan in enumerate(daily_plans)
         ]
         keyboard.extend([
@@ -167,8 +168,8 @@ I'm working to make the meal plan of your dreams, it might take some time...
         markup = InlineKeyboardMarkup(keyboard)
 
         query.edit_message_text(
-            text=f"""These are the daily plans of the meal number #{meal_plan_i + 1}.
-Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}    
+            text=f"""These are the daily plans of the meal number {meal_plan_i + 1}.
+Daily calories: {meal_plan['daily_calories']} - Diet: {utils.get_diet_type(meal_plan['diet_type'])}    
             """, reply_markup=markup
         )
         return MealPlanManager.CHOOSE_RECIPE
@@ -203,7 +204,7 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {meal_plan['diet_type']}
         ])
         markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text(
-            text=f"These are the recipes of day #{daily_plan_i + 1} of meal plan #{meal_plan_i + 1}", reply_markup=markup
+            text=f"These are the recipes of day {daily_plan_i + 1} of meal plan number {meal_plan_i + 1}", reply_markup=markup
         )
         return MealPlanManager.VIEW_RECIPE
 

@@ -331,7 +331,8 @@ What meal plan is it?
         meal_plans = self.meal_planner.get_meal_plans(user)
         context.user_data['user_meal_plans'] = meal_plans
         keyboard = [
-            [InlineKeyboardButton(f"#{i+1:2d}:{meal_plan['daily_calories']} calories - {meal_plan['diet_type']}", callback_data=i)] 
+            [InlineKeyboardButton(f"{i+1:2d}. \
+            {meal_plan['daily_calories']} calories - {utils.get_diet_type(meal_plan['diet_type'])}", callback_data=i)]
                 for i, meal_plan in enumerate(meal_plans)
         ]
         return keyboard

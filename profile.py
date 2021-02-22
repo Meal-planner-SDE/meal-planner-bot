@@ -8,6 +8,7 @@ from telegram.ext import (
     CallbackContext,
 )
 from datetime import date
+import utils
 
 class ProfileManager:
     def __init__(self, meal_planner, logger):
@@ -33,8 +34,8 @@ class ProfileManager:
         ]
         self.activity_markup = ReplyKeyboardMarkup(self.activity_keyboard, one_time_keyboard=True,  resize_keyboard=True)
 
-        self.conv_handler = ConversationHandler(
-            entry_points=[CommandHandler('start', self.start), CommandHandler('profile', self.start)],
+        self.conv_handler_edit = ConversationHandler(
+            entry_points=[CommandHandler('start', self.edit_profile), CommandHandler('editprofile', self.edit_profile)],
             states={
                 self.BIRTH: [
                     MessageHandler(
@@ -96,26 +97,10 @@ class ProfileManager:
                         self.error_invalid_activity_factor,
                     )
                 ],
-                # self.CHOOSING: [
-                #     MessageHandler(
-                #         Filters.regex('^(Age|Favourite colour|Number of siblings)$'), regular_choice
-                #     ),
-                #     MessageHandler(Filters.regex('^Something else...$'), custom_choice),
-                # ],
-                # self.TYPING_CHOICE: [
-                #     MessageHandler(
-                #         Filters.text & ~(Filters.command | Filters.regex('^Done$')), regular_choice
-                #     )
-                # ],
-                # self.TYPING_REPLY: [
-                #     MessageHandler(
-                #         Filters.text & ~(Filters.command | Filters.regex('^Done$')),
-                #         received_information,
-                #     )
-                # ],
             },
             fallbacks=[MessageHandler(Filters.command | Filters.regex('^Done$'), self.done)],
         )
+        self.conv_handler_show = CommandHandler('profile', self.profile)
 
     def identify_user(self, chat):
         user = {}
@@ -160,7 +145,7 @@ I only know how to behave to the following answers:
         )
 
 
-    def start(self, update: Update, context: CallbackContext) -> int:
+    def edit_profile(self, update: Update, context: CallbackContext) -> int:
         update.message.reply_text(
             """Welcome to meal planner bot.
 To help you to manage your meal plans, I need to know more about you.
@@ -168,7 +153,7 @@ What is your birth year?
             """,
             # reply_markup=markup,
         )
-        context.user_data['user'] = {}
+        context.user_data['tmp_user'] = {}
         return self.BIRTH
 
 
@@ -182,21 +167,21 @@ What is your birth year?
             update.message.reply_text(error_str)
             return self.BIRTH
 
-        context.user_data['user']['birth_year'] = birth_year
+        context.user_data['tmp_user']['birth_year'] = birth_year
         update.message.reply_text(f'Wonderful! Tell me your weight (in kg), please.')
         return self.WEIGHT
 
     def weight(self, update: Update, context: CallbackContext) -> int:
         text = update.message.text
         weight = int(text)
-        context.user_data['user']['weight'] = weight
+        context.user_data['tmp_user']['weight'] = weight
         update.message.reply_text(f'Awesome! Tell me your height (in cm), please.')
         return self.HEIGHT
 
     def height(self, update: Update, context: CallbackContext) -> int:
         text = update.message.text
         height = int(text)
-        context.user_data['user']['height'] = height
+        context.user_data['tmp_user']['height'] = height
         update.message.reply_text(f'Fabulous! Tell me your sex, please.',
             reply_markup=self.sex_markup)
         return self.SEX
@@ -204,7 +189,7 @@ What is your birth year?
     def sex(self, update: Update, context: CallbackContext) -> int:
         text = update.message.text
         sex = text.lower() if text in ['M', 'F'] else 'm'
-        context.user_data['user']['sex'] = sex
+        context.user_data['tmp_user']['sex'] = sex
         update.message.reply_text(f'Brillant! What is your diet type?',
             reply_markup=self.diet_markup)
         return self.DIET
@@ -220,7 +205,7 @@ What is your birth year?
 
         text = update.message.text
         diet = diet_map[text]
-        context.user_data['user']['diet_type'] = diet
+        context.user_data['tmp_user']['diet_type'] = diet
         update.message.reply_text(f'Stunning! How active would you define yourself?',
             reply_markup=self.activity_markup)
         return self.ACTIVITY_FACTOR
@@ -236,13 +221,19 @@ What is your birth year?
 
         text = update.message.text
         activity = activity_map[text]
-        context.user_data['user']['activity_factor'] = activity
+        context.user_data['tmp_user']['activity_factor'] = activity
         
         update.message.reply_text(f'I\'m updating your profile...')
         
-        user = self.save_user(context.user_data['user'], update)
+        user = self.save_user(context.user_data['tmp_user'], update)
+        if utils.is_error(user):
+            update.message.reply('''
+Ouch! It seems there's been an error, I'm so sorry! I suggest to try again in a few minutes.
+            ''')
+            return ConversationHandler.END
         context.user_data['user'] = user
-        update.message.reply_text(f'Magnificent! Your information have been saved correctly\n{user}')
+        update.message.reply_text(f'''Magnificent! Your information have been saved correctly. You can type /profile to 
+see your information.''')
 
         return ConversationHandler.END
 
@@ -253,13 +244,31 @@ What is your birth year?
         self.logger.info(str(user))
         return self.meal_planner.update_user(user)
 
+    def profile(self, update, context):
+        if not utils.authenticate(self.meal_planner, update, context):
+            return
+        user = context.user_data['user']
+
+        update.message.reply_text(f"""Cowabunga {user['username']}! This is what I know about you:
+- Height: {user['height']} cm
+- Weight: {user['weight']} kg
+- Sex: {user['sex'].upper()}
+- Birth year: {user['birth_year']}
+- Diet: {utils.get_diet_type(user['diet_type'])}
+- Activity factor: {utils.get_activity_factor(user['activity_factor'])}
+
+If you wish to change something, just type /editprofile. 
+        """
+        )
+
     def done(self, update: Update, context: CallbackContext) -> int:
         user_data = context.user_data
-        if 'user' in user_data:
-            del user_data['user']
+        if 'tmp_user' in user_data:
+            del user_data['tmp_user']
 
         update.message.reply_text(
             f"Uh-oh, it seems like you weren't able to complete the process. See you soon."
         )
 
         return ConversationHandler.END
+
