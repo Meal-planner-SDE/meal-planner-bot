@@ -133,11 +133,14 @@ class MealPlanner:
                 recipes.append(recipe)
 
         recipes_info = self.get_recipes_info(recipes)
-        recipes = [recipe for recipe in recipes_info.values()]
+        recipes = list(recipes_info.values())
+        print("Recipes:", recipes)
         shopping_list_entries = []
 
         for recipe in recipes:
             shopping_list_entries.extend(self.get_shopping_list_entries_from_recipe(recipe))
+        print("Entries:", shopping_list_entries)
+        
 
         final_shopping_list = requests.patch(f"{self.shopping_list_url}users/{user['mp_user_id']}/shoppingList", json=shopping_list_entries).json()
         return final_shopping_list
