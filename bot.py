@@ -203,7 +203,7 @@ class MealPlanner:
 
     def group_ingredients(self, ingredients_list):
         r = requests.post(f"{self.shopping_list_url}groupIngredients/", json=ingredients_list)
-        return r.json()
+        return sorted(r.json(), key = self.sort_categories) 
     
     def get_nearby_shops_by_categories(self, user, categories):
         params = {
@@ -211,7 +211,10 @@ class MealPlanner:
             'lon' : user['lon']
         }
         r = requests.post(f"{self.shopping_list_url}shopsByCategories/", json=categories, params=params)
-        return r.json()
+        return sorted(r.json(), key = self.sort_categories) 
+
+    def sort_categories(self, category):
+        return 'z' if category['category'] == "other" else category['category']
 
     def is_error(self, obj):
         return "error" in obj

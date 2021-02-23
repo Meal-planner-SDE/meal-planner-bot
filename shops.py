@@ -129,10 +129,6 @@ one to see which ingredients are there and where you can purchase 'em.
 
         user = context.user_data['user']
 
-        # if not user['address']:
-        #     user['lat'] = 46.0664228
-        #     user['lon'] = 11.1257601
-
         query = update.callback_query
         category_i = int(query.data)
         categories = context.user_data['categories']
