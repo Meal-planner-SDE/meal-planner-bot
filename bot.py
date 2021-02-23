@@ -423,12 +423,20 @@ class Bot:
         for i, handler in enumerate(handlers):
             dispatcher.add_handler(handler, i+1)
         
-        # Start the Bot
-        updater.start_polling()
+        PORT = int(os.environ.get("PORT", "8443"))
 
-        # Run the bot until you press Ctrl-C or the process receives SIGINT,
-        # SIGTERM or SIGABRT. This should be used most of the time, since
-        # start_polling() is non-blocking and will stop the bot gracefully.
+        # Starting bot
+        if len(sys.argv) == 2 and sys.argv[1] == "DEV":
+            # Developer mode with local instance
+            self.log("Start polling")
+            updater.start_polling()
+        else:
+            # Deployed version with heroku instance
+            self.log("Start webhook")
+            updater.start_webhook(listen="0.0.0.0",
+                                port=PORT,
+                                url_path=TOKEN)
+            updater.bot.set_webhook("https://hash-it-bot.herokuapp.com/" + TOKEN)
         updater.idle()
 
 
