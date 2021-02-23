@@ -137,14 +137,14 @@ one to see which ingredients are there and where you can purchase 'em.
 
         # category = list(filter(lambda x : x['category'] == category_name, categories))[0]
         ingredients = category['ingredients']
-        ingredients_list = '\n'.join(f"\- {ingredient['name']}" for ingredient in ingredients)
+        ingredients_list = '\n'.join(f"\- {ingredient['name']}" for ingredient in ingredients if 'name' in ingredient and ingredient['name'])
         markup = self.get_shops_keyboard(update, context, category['category'])
         query.edit_message_text(f"""
 These are the items of category '{category['category']}' in your shopping list:
 {ingredients_list}
 
 I found the following shops where I think you could buy them, check 'em out\.
-        """, reply_markup = markup, parse_mode = ParseMode.MARKDOWN_V2)
+        """, reply_markup = markup)
 
         return ShopsManager.CHOOSE_CATEGORY_SHOP
 
