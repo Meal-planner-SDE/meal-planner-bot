@@ -12,8 +12,8 @@ from markdownify import markdownify
 import utils
 
 class MealPlanManager:
-    MAX_DAYS = 7
-    MAX_MEALS = 5
+    MAX_DAYS = 5
+    MAX_MEALS = 4
     N_DAYS, N_MEALS = range(2)
     CHOOSE_MEAL_PLAN, CHOOSE_DAILY_PLAN, CHOOSE_RECIPE, VIEW_RECIPE = range(4)
     N_DAYS_KEYBOARD = [

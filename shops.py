@@ -143,7 +143,7 @@ one to see which ingredients are there and where you can purchase 'em.
 These are the items of category '{category['category']}' in your shopping list:
 {ingredients_list}
 
-I found the following shops where I think you could buy them, check 'em out\.
+I found the following shops where I think you could buy them, check 'em out.
         """, reply_markup = markup)
 
         return ShopsManager.CHOOSE_CATEGORY_SHOP
