@@ -230,7 +230,8 @@ class MealPlanner:
             'm' : meals_per_day,
             'diet' : user['diet_type']
         }
-        new_meal_plan = dict(requests.get(f"{self.meal_planner_url}mealPlans", params=payload).json())
+
+        new_meal_plan = requests.get(f"{self.meal_planner_url}mealPlans", params=payload).json()
         saved_meal_plan = requests.post(f"{self.meal_planner_url}mealPlans/{user['mp_user_id']}", json=new_meal_plan).json()
        
         return saved_meal_plan

@@ -12,8 +12,8 @@ from markdownify import markdownify
 import utils
 
 class MealPlanManager:
-    MAX_DAYS = 10
-    MAX_MEALS = 10
+    MAX_DAYS = 7
+    MAX_MEALS = 5
     N_DAYS, N_MEALS = range(2)
     CHOOSE_MEAL_PLAN, CHOOSE_DAILY_PLAN, CHOOSE_RECIPE, VIEW_RECIPE = range(4)
     N_DAYS_KEYBOARD = [
@@ -113,10 +113,14 @@ I'm working to make the meal plan of your dreams, it might take some time...
         )
         new_meal_plan = context.user_data['new_meal_plan']
         meal_plan = self.meal_planner.create_meal_plan(context.user_data['user'], new_meal_plan['n_days'], new_meal_plan['n_meals'])
-        update.message.reply_text(
-            f"""Here it is:
-{meal_plan}
+        if utils.is_error(meal_plan):
+            msg = f"""Uh, it seems there's been an error: '{meal_plan['error']}'. Try again in a few minutes."""
+        else:
+            msg = f"""I created a new meal plan with {meal_plan['daily_calories']} daily calories for \
+a {utils.get_diet_type(meal_plan['diet_type']).lower()}. Check it out by typing /mealplans.
             """
+        update.message.reply_text(
+            msg
         )
         del context.user_data['new_meal_plan']
         return ConversationHandler.END
@@ -192,7 +196,7 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {utils.get_diet_type(meal_
         # if not 'user_recipes' in context.user_data:
         # else:
         #     recipes_info = context.user_data['user_recipes']
-
+        print(daily_plan['recipes'])
         keyboard = [
             [InlineKeyboardButton(f"{recipes_info[recipe['recipe_id']]['title']}", callback_data=recipe['recipe_id'])] 
                 for recipe in daily_plan['recipes']
@@ -226,10 +230,12 @@ Daily calories: {meal_plan['daily_calories']} - Diet: {utils.get_diet_type(meal_
         recipe = recipes_info[recipe_id]
         image = ""
         if 'instructions' in recipe:
-            instructions = recipe['instructions']
+            if recipe['instructions']:
+                instructions = recipe['instructions']
         if 'image' in recipe:
             if recipe['image']:
                 image = f"[​​​​​​​​​​​]({recipe['image']})"
+        print(instructions)
         query.edit_message_text(
             text=f"""Let's have a look at {recipe['title']}:
             {image}

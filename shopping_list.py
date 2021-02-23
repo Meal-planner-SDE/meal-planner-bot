@@ -301,15 +301,18 @@ Let's find out which recipes will be in your menu then!
         instructions = "I wasn't able to find any instructions for this recipe. You'll have to be creative I guess."
         image = ""
         if 'instructions' in recipe:
-            instructions = recipe['instructions']
+            if recipe['instructions']:
+                instructions = recipe['instructions']
         if 'image' in recipe:
             if recipe['image']:
                 image = f"[​​​​​​​​​​​]({recipe['image']})"
+                
         query.edit_message_text(
             text=f"""Let's have a look at {recipe['title']}:
             {image}
+Instructions for {recipe['servings']} servings:
 {markdownify(instructions)}
-            """, reply_markup=markup, parse_mode=ParseMode.MARKDOWN
+""", reply_markup=markup, parse_mode=ParseMode.MARKDOWN
         )
         return 
 
