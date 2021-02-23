@@ -22,7 +22,7 @@ class MealPlanManager:
     N_DAYS_MARKUP = ReplyKeyboardMarkup(N_DAYS_KEYBOARD, one_time_keyboard=True, resize_keyboard=True)
 
     N_MEALS_KEYBOARD = [
-        list(range(1, MAX_DAYS + 1))
+        list(range(1, MAX_MEALS + 1))
     ]
     N_MEALS_MARKUP = ReplyKeyboardMarkup(N_MEALS_KEYBOARD, one_time_keyboard=True, resize_keyboard=True)
 
@@ -82,9 +82,9 @@ How many days would you plan?
         text = update.message.text
         days = int(text)
         
-        if not (0 < days < MealPlanManager.MAX_DAYS):
-            error_str = "Wooopsie."
-            update.message.reply_text(error_str)
+        if not (0 < days <= MealPlanManager.MAX_DAYS):
+            error_str = f"Wooopsie. The number of days must be between 0 and {MealPlanManager.MAX_DAYS}"
+            update.message.reply_text(error_str, reply_markup=MealPlanManager.N_DAYS_MARKUP)
             return MealPlanManager.N_DAYS
 
         context.user_data['new_meal_plan']['n_days'] = days
@@ -100,9 +100,9 @@ How many days would you plan?
         text = update.message.text
         meals = int(text)
         
-        if not (0 < meals < MealPlanManager.MAX_MEALS):
-            error_str = "Wooopsie."
-            update.message.reply_text(error_str)
+        if not (0 < meals <= MealPlanManager.MAX_MEALS):
+            error_str = f"Wooopsie. The number of meals must be between 0 and {MealPlanManager.MAX_MEALS}"
+            update.message.reply_text(error_str, reply_markup=MealPlanManager.N_MEALS_MARKUP)
             return MealPlanManager.N_MEALS
 
         context.user_data['new_meal_plan']['n_meals'] = meals

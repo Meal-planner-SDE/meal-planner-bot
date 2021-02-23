@@ -137,7 +137,7 @@ one to see which ingredients are there and where you can purchase 'em.
 
         # category = list(filter(lambda x : x['category'] == category_name, categories))[0]
         ingredients = category['ingredients']
-        ingredients_list = '\n'.join(f"\- {ingredient['name']}" for ingredient in ingredients if 'name' in ingredient and ingredient['name'])
+        ingredients_list = '\n'.join(f"- {ingredient['name']}" for ingredient in ingredients if 'name' in ingredient and ingredient['name'])
         markup = self.get_shops_keyboard(update, context, category['category'])
         query.edit_message_text(f"""
 These are the items of category '{category['category']}' in your shopping list:
