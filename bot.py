@@ -148,6 +148,7 @@ class MealPlanner:
     def get_shopping_list_entries_from_recipe(self, recipe):
         shopping_list_entries = []
         for ingredient in recipe['ingredients']:
+            if ingredient['id'] and ingredient['id']:
                 shopping_list_entries.append({
                     "ingredient_id": ingredient['id'],
                     "ingredient_name": ingredient['name'],
